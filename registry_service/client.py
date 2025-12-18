@@ -22,7 +22,7 @@ class ServiceRegistryClient:
         client = ServiceRegistryClient(
             service_name="users",
             base_url="http://localhost:8000",
-            registry_url="http://localhost:8006"
+            registry_url="http://localhost:5000"
         )
         await client.register()
         # Service is now registered
@@ -42,12 +42,12 @@ class ServiceRegistryClient:
         Args:
             service_name: Name of the service (e.g., 'users', 'timelines', 'likes')
             base_url: Base URL of this service instance (e.g., 'http://localhost:8000')
-            registry_url: URL of the service registry (defaults to REGISTRY_URL env var or http://localhost:8006)
+            registry_url: URL of the service registry (defaults to REGISTRY_URL env var or http://localhost:5000)
             heartbeat_interval: Seconds between heartbeats (default: 10)
         """
         self.service_name = service_name
         self.base_url = base_url
-        self.registry_url = registry_url or os.getenv("REGISTRY_URL", "http://localhost:8006")
+        self.registry_url = registry_url or os.getenv("REGISTRY_URL", "http://localhost:5000")
         self.heartbeat_interval = heartbeat_interval
         self.instance_id: Optional[str] = None
         self._heartbeat_task: Optional[asyncio.Task] = None

@@ -62,7 +62,7 @@ def create_post(data: PostCreate, current_username: str = Depends(get_current_us
     if not users_service_url:
         raise HTTPException(status_code=502, detail="Users service not available")
     with httpx.Client(timeout=5.0) as client:
-        resp = client.get(f"{users_service_url}/users/{current_username}")
+        resp = client.get(f"{users_service_url}users/{current_username}")
         if resp.status_code != 200:
             raise HTTPException(status_code=502, detail="Failed to resolve user_id from users service")
         user_data = resp.json()
@@ -74,9 +74,17 @@ def create_post(data: PostCreate, current_username: str = Depends(get_current_us
     db.add(post)
     db.commit()
     db.refresh(post)
-    
     # Return PostOut with username since schema expects username, not user_id
-    return post
+    res = PostOut(
+            post_id=post.post_id,
+            user_id=post.user_id,
+            username=current_username,
+            text=post.text,
+            created_at=post.created_at,
+            repost_original_url=post.repost_original_url
+        )
+
+    return res
 
 
 @app.post("/posts/async", status_code=status.HTTP_202_ACCEPTED)
@@ -91,7 +99,7 @@ def create_post_async(data: PostCreate, current_username: str = Depends(get_curr
         raise HTTPException(status_code=502, detail="Users service not available")
     
     with httpx.Client(timeout=5.0) as client:
-        resp = client.get(f"{users_service_url}/users/{current_username}")
+        resp = client.get(f"{users_service_url}users/{current_username}")
         if resp.status_code != 200:
             raise HTTPException(status_code=502, detail="Failed to resolve user_id from users service")
         user_data = resp.json()
@@ -136,6 +144,7 @@ def get_post(post_id: int, db: Session = Depends(get_db)):
     
     # Return PostOut with placeholder username (validation worker only checks status code)
     return PostOut(
+        post_id=post.post_id,
         user_id=post.user_id,
         username=str(post.user_id),  # Placeholder - validation worker doesn't use this
         text=post.text,
@@ -150,7 +159,7 @@ def user_timeline(username: str, limit: int = Query(50, ge=1, le=200), offset: i
     if not users_service_url:
         raise HTTPException(status_code=502, detail="Users service not available")
     with httpx.Client(timeout=5.0) as client:
-        resp = client.get(f"{users_service_url}/users/{username}")
+        resp = client.get(f"{users_service_url}users/{username}")
         if resp.status_code != 200:
             raise HTTPException(status_code=404, detail="User not found")
         user_data = resp.json()
@@ -162,13 +171,35 @@ def user_timeline(username: str, limit: int = Query(50, ge=1, le=200), offset: i
     ).scalars().all()
     
     # Map Post objects to PostOut with username (all posts are from the same user)
-    return posts
+    po = []
+    for p in posts:
+        a = PostOut(
+                post_id=p.post_id,
+                user_id=p.user_id,
+                username=str(p.user_id), # placeholder
+                text=p.text,
+                created_at=p.created_at,
+                repost_original_url=p.repost_original_url
+            )
+        po.append(a)
+    return po
 
 
 @app.get("/posts", response_model=list[PostOut])
 def public_timeline(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
     posts = db.execute(select(Post).order_by(Post.created_at.desc()).limit(limit).offset(offset)).scalars().all()
-    return posts
+    po = []
+    for p in posts:
+        a = PostOut(
+                post_id=p.post_id,
+                user_id=p.user_id,
+                username=str(p.user_id), # placeholder
+                text=p.text,
+                created_at=p.created_at,
+                repost_original_url=p.repost_original_url
+            )
+        po.append(a)
+    return po
 
 
 @app.get("/posts/home/{username}", response_model=list[PostOut])
@@ -185,7 +216,7 @@ def home_timeline(username: str, limit: int = Query(50, ge=1, le=200), offset: i
     # Note: FastAPI dependency already validated token; here we just pass it through if present
     # We cannot directly access the header value here; rely on httpx without auth for this public endpoint
     with httpx.Client(timeout=5.0) as client:
-        resp = client.get(f"{users_service_url}/users/{current_username}/followees", headers=headers)
+        resp = client.get(f"{users_service_url}users/{current_username}/followees", headers=headers)
         if resp.status_code != 200:
             raise HTTPException(status_code=502, detail="Failed to fetch followees from users service")
         data = resp.json()
@@ -202,5 +233,17 @@ def home_timeline(username: str, limit: int = Query(50, ge=1, le=200), offset: i
         .limit(limit)
         .offset(offset)
     ).scalars().all()
-    return posts
+
+    po = []
+    for p in posts:
+        a = PostOut(
+                post_id=p.post_id,
+                user_id=p.user_id,
+                username=str(p.user_id), # placeholder
+                text=p.text,
+                created_at=p.created_at,
+                repost_original_url=p.repost_original_url
+            )
+        po.append(a)
+    return po
 

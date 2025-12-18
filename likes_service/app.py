@@ -24,7 +24,7 @@ LIKE_NOTIFICATION_QUEUE = "like_notification"
 @app.on_event("startup")
 async def on_startup():
     # Register with service registry
-    port = os.getenv("PORT", "8004")
+    port = os.getenv("PORT", "5400")
     base_url = f"http://localhost:{port}"
     await register_service("likes", base_url)
 

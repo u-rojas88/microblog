@@ -8,6 +8,7 @@ class PostCreate(BaseModel):
 
 
 class PostOut(BaseModel):
+    post_id: int
     user_id: int
     username: str
     text: str

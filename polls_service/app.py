@@ -5,8 +5,10 @@ from typing import Annotated
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from boto3.dynamodb.conditions import Key
+import json
+from decimal import Decimal
 
-from .db import get_polls_table
+from .db import get_polls_table, create_polls_table_if_not_exists
 from .auth import decode_token
 from .schemas import PollCreate, PollOut, VoteIn, VoteResult
 from registry_service.client import register_service, deregister_service
@@ -17,8 +19,10 @@ app = FastAPI(title="Polls Service")
 
 @app.on_event("startup")
 async def on_startup():
+    # Create DynamoDB table if it doesn't exist
+    create_polls_table_if_not_exists()
     # Register with service registry
-    port = os.getenv("PORT", "8005")
+    port = os.getenv("PORT", "5700")
     base_url = f"http://localhost:{port}"
     await register_service("polls", base_url)
 
@@ -111,25 +115,21 @@ def vote_poll(poll_id: str, vote: VoteIn, current_username: str = Depends(get_cu
 
     # Transaction: create vote if not exists AND increment the relevant counter
     inc_attr = f"count{vote.choice_index}"
+    # Debug log to inspect stored types for the counter we are about to increment
+    inc_value = poll_item.get(inc_attr)
+
     try:
         table.meta.client.transact_write_items(
             TransactItems=[
                 {
-                    "ConditionCheck": {
-                        "TableName": table.name,
-                        "Key": {"pk": {"S": _poll_pk(poll_id)}, "sk": {"S": "POLL"}},
-                        "ConditionExpression": "attribute_exists(pk)",
-                    }
-                },
-                {
                     "Put": {
                         "TableName": table.name,
                         "Item": {
-                            "pk": {"S": _poll_pk(poll_id)},
-                            "sk": {"S": _vote_sk(current_username)},
-                            "poll_id": {"S": poll_id},
-                            "username": {"S": current_username},
-                            "choice_index": {"N": str(vote.choice_index)},
+                            "pk": _poll_pk(poll_id),
+                            "sk": _vote_sk(current_username),
+                            "poll_id": poll_id,
+                            "username": current_username,
+                            "choice_index": Decimal(vote.choice_index),
                         },
                         "ConditionExpression": "attribute_not_exists(pk)",
                     }
@@ -137,9 +137,10 @@ def vote_poll(poll_id: str, vote: VoteIn, current_username: str = Depends(get_cu
                 {
                     "Update": {
                         "TableName": table.name,
-                        "Key": {"pk": {"S": _poll_pk(poll_id)}, "sk": {"S": "POLL"}},
+                        "Key": {"pk": _poll_pk(poll_id), "sk": "POLL"},
+                        "ConditionExpression": "attribute_exists(pk)",
                         "UpdateExpression": f"ADD {inc_attr} :one",
-                        "ExpressionAttributeValues": {":one": {"N": "1"}},
+                        "ExpressionAttributeValues": {":one": Decimal(1)},
                     }
                 },
             ]

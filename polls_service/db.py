@@ -30,6 +30,34 @@ def get_dynamodb_resource():
     )
 
 
+def create_polls_table_if_not_exists():
+    """
+    Create the polls table if it doesn't exist.
+    Called during service startup.
+    """
+    dynamodb = get_dynamodb_resource()
+    table_name = os.getenv("DYNAMODB_POLLS_TABLE", "Polls")
+    
+    existing = [t.name for t in dynamodb.tables.all()]
+    if table_name in existing:
+        return
+    
+    table = dynamodb.create_table(
+        TableName=table_name,
+        KeySchema=[
+            {"AttributeName": "pk", "KeyType": "HASH"},
+            {"AttributeName": "sk", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "pk", "AttributeType": "S"},
+            {"AttributeName": "sk", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table.wait_until_exists()
+    print(f"Created DynamoDB table: {table_name}")
+
+
 def get_polls_table():
     """
     Dependency: retrieve the polls table object (single-table design).

@@ -9,7 +9,7 @@ from typing import Optional
 import httpx
 
 
-REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:8006")
+REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:5000")
 
 
 async def get_service_url(service_name: str) -> Optional[str]:

@@ -127,7 +127,7 @@ def validate_post_worker():
                 # Check if the specific post exists
                 try:
                     with httpx.Client(timeout=5.0) as http_client:
-                        resp = http_client.get(f"{timelines_service_url}/posts/id/{post_id}")
+                        resp = http_client.get(f"{timelines_service_url}posts/id/{post_id}")
                         
                         if resp.status_code == 200:
                             # Post exists - validation passed
@@ -143,7 +143,7 @@ def validate_post_worker():
                             if users_service_url:
                                 try:
                                     with httpx.Client(timeout=5.0) as http_client:
-                                        user_resp = http_client.get(f"{users_service_url}/users/{username}")
+                                        user_resp = http_client.get(f"{users_service_url}users/{username}")
                                         if user_resp.status_code == 200:
                                             user_data = user_resp.json()
                                             user_email = user_data.get("email")
@@ -174,7 +174,7 @@ def validate_post_worker():
                         if users_service_url:
                             try:
                                 with httpx.Client(timeout=5.0) as http_client:
-                                    user_resp = http_client.get(f"{users_service_url}/users/{username}")
+                                    user_resp = http_client.get(f"{users_service_url}users/{username}")
                                     if user_resp.status_code == 200:
                                         user_data = user_resp.json()
                                         user_email = user_data.get("email")
@@ -264,7 +264,7 @@ def notification_worker():
                 try:
                     with httpx.Client(timeout=5.0) as http_client:
                         # Get public timeline and find the post
-                        resp = http_client.get(f"{timelines_service_url}/posts", params={"limit": 200})
+                        resp = http_client.get(f"{timelines_service_url}posts", params={"limit": 200})
                         if resp.status_code == 200:
                             posts = resp.json()
                             post = next((p for p in posts if p.get("post_id") == post_id), None)
@@ -273,7 +273,7 @@ def notification_worker():
                                 post_author_username = post.get("username")
                                 
                                 # Get post author's email
-                                user_resp = http_client.get(f"{users_service_url}/users/{post_author_username}")
+                                user_resp = http_client.get(f"{users_service_url}users/{post_author_username}")
                                 if user_resp.status_code == 200:
                                     user_data = user_resp.json()
                                     author_email = user_data.get("email")

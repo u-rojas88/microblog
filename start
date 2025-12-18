@@ -1,0 +1,9 @@
+foreman start --formation \
+registry=1,\
+users=1,\
+timelines=3,\
+timelines_worker=1,\
+likes=1,\
+likes_validation_worker=1,\
+likes_notification_worker=1,\
+polls=1

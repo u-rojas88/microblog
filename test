@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_URL="${BASE_URL:-http://localhost:8080}"
+
+echo "Using base URL: ${BASE_URL}"
+
+if ! command -v http >/dev/null 2>&1; then
+  echo "Error: httpie (http) is not installed or not in PATH." >&2
+  exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Error: jq is required to parse JSON responses." >&2
+  exit 1
+fi
+
+echo "=== Creating users (user1, user2, user3) ==="
+
+http POST "${BASE_URL}/register" \
+  username=user1 \
+  email=user1@example.com \
+  password=password1 \
+  bio='User 1 bio' >/dev/null
+
+http POST "${BASE_URL}/register" \
+  username=user2 \
+  email=user2@example.com \
+  password=password2 \
+  bio='User 2 bio' >/dev/null
+
+http POST "${BASE_URL}/register" \
+  username=user3 \
+  email=user3@example.com \
+  password=password3 \
+  bio='User 3 bio' >/dev/null
+
+echo "=== Logging in users to obtain JWT tokens ==="
+
+USER1_TOKEN="$(
+  http -b POST "${BASE_URL}/login?username=user1&password=password1" | jq -r '.access_token'
+)"
+USER2_TOKEN="$(
+  http -b POST "${BASE_URL}/login?username=user2&password=password2" | jq -r '.access_token'
+)"
+USER3_TOKEN="$(
+  http -b POST "${BASE_URL}/login?username=user3&password=password3" | jq -r '.access_token'
+)"
+
+echo "user1 token: ${USER1_TOKEN:0:16}..."
+echo "user2 token: ${USER2_TOKEN:0:16}..."
+echo "user3 token: ${USER3_TOKEN:0:16}..."
+
+echo "=== Creating follow relationships ==="
+
+echo "user1 follows user2 and user3"
+http -b POST "${BASE_URL}/users/follow/user2" \
+  "Authorization:Bearer ${USER1_TOKEN}" >/dev/null
+http -b POST "${BASE_URL}/users/follow/user3" \
+  "Authorization:Bearer ${USER1_TOKEN}" >/dev/null
+
+echo "user2 follows user3"
+http -b POST "${BASE_URL}/users/follow/user3" \
+  "Authorization:Bearer ${USER2_TOKEN}" >/dev/null
+
+echo "Current followees for user1:"
+http -b GET "${BASE_URL}/users/user1/followees" | jq .
+
+echo "=== Creating posts via timelines service (through gateway) ==="
+
+POST1_JSON="$(
+  http -b POST "${BASE_URL}/posts" \
+    "Authorization:Bearer ${USER1_TOKEN}" \
+    text="Hello from user1" \
+  | jq .
+)"
+POST1_ID="$(echo "${POST1_JSON}" | jq -r '.post_id')"
+echo "user1 created post ${POST1_ID}"
+
+POST2_JSON="$(
+  http -b POST "${BASE_URL}/posts" \
+    "Authorization:Bearer ${USER2_TOKEN}" \
+    text="Hi, this is user2" \
+  | jq .
+)"
+POST2_ID="$(echo "${POST2_JSON}" | jq -r '.post_id')"
+echo "user2 created post ${POST2_ID}"
+
+POST3_JSON="$(
+  http -b POST "${BASE_URL}/posts" \
+    "Authorization:Bearer ${USER3_TOKEN}" \
+    text="Greetings from user3" \
+  | jq .
+)"
+POST3_ID="$(echo "${POST3_JSON}" | jq -r '.post_id')"
+echo "user3 created post ${POST3_ID}"
+
+POST4_JSON="$(
+  http -b POST "${BASE_URL}/posts/async" \
+    "Authorization:Bearer ${USER3_TOKEN}" \
+    text="Send greetings into job queue post endpoint by user3" \
+  | jq .
+)"
+POST4_ID="$(echo "${POST4_JSON}" | jq -r '.status, .message')"
+echo "user3 created post ${POST4_ID}"
+
+echo "=== Fetching timelines ==="
+
+echo "Public timeline:"
+http -b GET "${BASE_URL}/posts" | jq .
+
+echo "Timeline for user2:"
+http -b GET "${BASE_URL}/posts/user2" | jq .
+
+echo "Home timeline for user1 (should include posts from user2 and user3):"
+http -b GET "${BASE_URL}/posts/home/user1" \
+  "Authorization:Bearer ${USER1_TOKEN}" | jq .
+
+echo "=== Testing likes service ==="
+
+echo "user1 likes post ${POST2_ID}"
+http -b POST "${BASE_URL}/likes/${POST2_ID}" \
+  "Authorization:Bearer ${USER1_TOKEN}" | jq .
+
+echo "user2 likes post ${POST1_ID}"
+http -b POST "${BASE_URL}/likes/${POST1_ID}" \
+  "Authorization:Bearer ${USER2_TOKEN}" | jq .
+
+echo "Like count for post ${POST1_ID}:"
+http -b GET "${BASE_URL}/likes/${POST1_ID}/count" | jq .
+
+echo "Posts liked by user1:"
+http -b GET "${BASE_URL}/users/user1/likes" | jq .
+
+echo "Popular posts by likes:"
+http -b GET "${BASE_URL}/likes/popular" | jq .
+
+echo "=== Testing polls service ==="
+
+echo "user1 creates a poll"
+POLL_JSON="$(
+  http -b POST "${BASE_URL}/polls" \
+    "Authorization:Bearer ${USER1_TOKEN}" \
+    question="Your favorite language?" \
+    options:='["Python","Go","Rust","JavaScript"]' \
+  | jq .
+)"
+POLL_ID="$(echo "${POLL_JSON}" | jq -r '.poll_id')"
+echo "Created poll with id ${POLL_ID}"
+
+echo "user2 votes for option 0 (Python)"
+http -b POST "${BASE_URL}/polls/${POLL_ID}/vote" \
+  "Authorization:Bearer ${USER2_TOKEN}" \
+  choice_index:=0 | jq .
+
+echo "user3 votes for option 2 (Rust)"
+http -b POST "${BASE_URL}/polls/${POLL_ID}/vote" \
+  "Authorization:Bearer ${USER3_TOKEN}" \
+  choice_index:=2 | jq .
+
+echo "Poll details:"
+http -b GET "${BASE_URL}/polls/${POLL_ID}" | jq .
+
+echo "Poll results:"
+http -b GET "${BASE_URL}/polls/${POLL_ID}/results" | jq .
+
+echo "=== Done. Microservices tested via httpie. ==="
+
+if ! command -v hey >/dev/null 2>&1; then
+  echo "Error: hey is not installed or not in PATH." >&2
+  exit 1
+fi
+
+echo "=== Testing /posts ==="
+
+hey \
+  -n 500 \
+  -c 20 \
+  -m POST \
+  -H "Authorization: Bearer ${USER1_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Load test synchronous endpoint"}' \
+  "${BASE_URL}/posts"
+
+echo "=== Testing /posts/async ==="
+
+hey \
+  -n 500 \
+  -c 20 \
+  -m POST \
+  -H "Authorization: Bearer ${USER1_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Load test synchronous endpoint"}' \
+  "${BASE_URL}/posts/async"
+
+echo "=== Done. Performance test for /posts/async and /post endpoints using hey. ==="

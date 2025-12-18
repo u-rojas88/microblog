@@ -1,0 +1,275 @@
+Using base URL: http://localhost:8080
+=== Creating users (user1, user2, user3) ===
+=== Logging in users to obtain JWT tokens ===
+user1 token: eyJhbGciOiJIUzI1...
+user2 token: eyJhbGciOiJIUzI1...
+user3 token: eyJhbGciOiJIUzI1...
+=== Creating follow relationships ===
+user1 follows user2 and user3
+user2 follows user3
+Current followees for user1:
+{
+  "followees": [
+    {
+      "user_id": 2,
+      "username": "user2"
+    },
+    {
+      "user_id": 3,
+      "username": "user3"
+    }
+  ]
+}
+=== Creating posts via timelines service (through gateway) ===
+user1 created post 1
+user2 created post 2
+user3 created post 3
+user3 created post accepted
+Post creation queued for processing
+=== Fetching timelines ===
+Public timeline:
+[
+  {
+    "post_id": 4,
+    "user_id": 3,
+    "username": "3",
+    "text": "Send greetings into job queue post endpoint by user3",
+    "created_at": "2025-12-11T15:12:56.074286",
+    "repost_original_url": null
+  },
+  {
+    "post_id": 3,
+    "user_id": 3,
+    "username": "3",
+    "text": "Greetings from user3",
+    "created_at": "2025-12-11T15:12:55.669237",
+    "repost_original_url": null
+  },
+  {
+    "post_id": 2,
+    "user_id": 2,
+    "username": "2",
+    "text": "Hi, this is user2",
+    "created_at": "2025-12-11T15:12:55.305620",
+    "repost_original_url": null
+  },
+  {
+    "post_id": 1,
+    "user_id": 1,
+    "username": "1",
+    "text": "Hello from user1",
+    "created_at": "2025-12-11T15:12:54.911327",
+    "repost_original_url": null
+  }
+]
+Timeline for user2:
+[
+  {
+    "post_id": 2,
+    "user_id": 2,
+    "username": "2",
+    "text": "Hi, this is user2",
+    "created_at": "2025-12-11T15:12:55.305620",
+    "repost_original_url": null
+  }
+]
+Home timeline for user1 (should include posts from user2 and user3):
+[
+  {
+    "post_id": 4,
+    "user_id": 3,
+    "username": "3",
+    "text": "Send greetings into job queue post endpoint by user3",
+    "created_at": "2025-12-11T15:12:56.074286",
+    "repost_original_url": null
+  },
+  {
+    "post_id": 3,
+    "user_id": 3,
+    "username": "3",
+    "text": "Greetings from user3",
+    "created_at": "2025-12-11T15:12:55.669237",
+    "repost_original_url": null
+  },
+  {
+    "post_id": 2,
+    "user_id": 2,
+    "username": "2",
+    "text": "Hi, this is user2",
+    "created_at": "2025-12-11T15:12:55.305620",
+    "repost_original_url": null
+  }
+]
+=== Testing likes service ===
+user1 likes post 2
+{
+  "status": "ok",
+  "liked": true,
+  "post_id": 2
+}
+user2 likes post 1
+{
+  "status": "ok",
+  "liked": true,
+  "post_id": 1
+}
+Like count for post 1:
+{
+  "post_id": 1,
+  "likes": 1
+}
+Posts liked by user1:
+{
+  "username": "user1",
+  "post_ids": [
+    2
+  ]
+}
+Popular posts by likes:
+{
+  "post_ids": [
+    2,
+    1
+  ]
+}
+=== Testing polls service ===
+user1 creates a poll
+Created poll with id 2aaa4666a7804109b783f9b16a010391
+user2 votes for option 0 (Python)
+{
+  "status": "ok",
+  "poll": {
+    "poll_id": "2aaa4666a7804109b783f9b16a010391",
+    "question": "Your favorite language?",
+    "options": [
+      "Python",
+      "Go",
+      "Rust",
+      "JavaScript"
+    ],
+    "counts": [
+      1,
+      0,
+      0,
+      0
+    ],
+    "created_by": "user1",
+    "created_at": "2025-12-11T15:12:58.737720Z"
+  }
+}
+user3 votes for option 2 (Rust)
+{
+  "status": "ok",
+  "poll": {
+    "poll_id": "2aaa4666a7804109b783f9b16a010391",
+    "question": "Your favorite language?",
+    "options": [
+      "Python",
+      "Go",
+      "Rust",
+      "JavaScript"
+    ],
+    "counts": [
+      1,
+      0,
+      1,
+      0
+    ],
+    "created_by": "user1",
+    "created_at": "2025-12-11T15:12:58.737720Z"
+  }
+}
+Poll details:
+{
+  "poll_id": "2aaa4666a7804109b783f9b16a010391",
+  "question": "Your favorite language?",
+  "options": [
+    "Python",
+    "Go",
+    "Rust",
+    "JavaScript"
+  ],
+  "counts": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "created_by": "user1",
+  "created_at": "2025-12-11T15:12:58.737720Z"
+}
+Poll results:
+{
+  "poll_id": "2aaa4666a7804109b783f9b16a010391",
+  "question": "Your favorite language?",
+  "options": [
+    "Python",
+    "Go",
+    "Rust",
+    "JavaScript"
+  ],
+  "counts": [
+    1,
+    0,
+    1,
+    0
+  ],
+  "created_by": "user1",
+  "created_at": "2025-12-11T15:12:58.737720Z"
+}
+=== Done. Microservices tested via httpie. ===
+==== Testing /posts ====
+
+Summary:
+  Total:	0.0050 secs
+  Slowest:	0.0000 secs
+  Fastest:	0.0000 secs
+  Average:	 NaN secs
+  Requests/sec:	100470.5639
+  
+
+Response time histogram:
+
+
+Latency distribution:
+
+Details (average, fastest, slowest):
+  DNS+dialup:	 NaN secs, 0.0000 secs, 0.0000 secs
+  DNS-lookup:	 NaN secs, 0.0000 secs, 0.0000 secs
+  req write:	 NaN secs, 0.0000 secs, 0.0000 secs
+  resp wait:	 NaN secs, 0.0000 secs, 0.0000 secs
+  resp read:	 NaN secs, 0.0000 secs, 0.0000 secs
+
+Status code distribution:
+
+Error distribution:
+  [500]	Post "/posts": unsupported protocol scheme ""
+
+==== Testing /posts/async ====
+
+Summary:
+  Total:	0.0024 secs
+  Slowest:	0.0000 secs
+  Fastest:	0.0000 secs
+  Average:	 NaN secs
+  Requests/sec:	210022.7917
+  
+
+Response time histogram:
+
+
+Latency distribution:
+
+Details (average, fastest, slowest):
+  DNS+dialup:	 NaN secs, 0.0000 secs, 0.0000 secs
+  DNS-lookup:	 NaN secs, 0.0000 secs, 0.0000 secs
+  req write:	 NaN secs, 0.0000 secs, 0.0000 secs
+  resp wait:	 NaN secs, 0.0000 secs, 0.0000 secs
+  resp read:	 NaN secs, 0.0000 secs, 0.0000 secs
+
+Status code distribution:
+
+Error distribution:
+  [500]	Post "/posts/async": unsupported protocol scheme ""
+
+=== Done. Performance test for /posts/async and /post endpoints using hey. ===
